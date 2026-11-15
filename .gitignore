@@ -1,0 +1,16 @@
+STATE.md
+STATE/
+STOP
+__pycache__/
+*.egg-info/
+.venv/
+.ruff_cache/
+*cookie*.txt
+cookies.json
+*.part
+.humble-state.json*
+.humble-lock
+.humble-moves.log
+probe-out/
+tests/private/
+dist/
