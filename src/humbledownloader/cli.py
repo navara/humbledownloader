@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from . import redact
+from . import __version__, redact
 from .flight import LayoutError
 from .run import LibraryLocked, run
 from .site import (
@@ -26,6 +26,9 @@ def parse_args(args):
     parser = argparse.ArgumentParser(
         prog="humbledl",
         description="Download your Humble Bundle library from the Humble website.",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"humbledl {__version__}"
     )
     parser.add_argument(
         "command",

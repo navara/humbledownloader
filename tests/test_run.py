@@ -260,14 +260,15 @@ def test_failed_final_rename_restores_the_old_version(tmp_path, monkeypatch):
 
     folder(tmp_path).mkdir(parents=True)
     (folder(tmp_path) / "book.pdf").write_bytes(b"old version, other size")
-    real_rename = os.rename
+    real_rename_new = run_mod.rename_new
 
-    def rename(src, dst):
+    # patched one level up from os.rename: on POSIX rename_new links instead
+    def rename_new(src, dst):
         if src.endswith(".part"):
             raise PermissionError("held by antivirus")
-        real_rename(src, dst)
+        real_rename_new(src, dst)
 
-    monkeypatch.setattr(run_mod.os, "rename", rename)
+    monkeypatch.setattr(run_mod, "rename_new", rename_new)
     monkeypatch.setattr(run_mod.time, "sleep", lambda s: None)
     s = go(tmp_path, *make_http())
     assert s.counts["failed"] == 2
@@ -460,8 +461,9 @@ def test_identical_update_with_a_locked_part_still_counts_as_current(
     newer_extra(cdn)
     real_remove = os.remove
 
+    # only extra.pdf's part: on POSIX rename_new also removes book.pdf's part
     def locked(path):
-        if str(path).endswith(".part"):
+        if str(path).endswith("extra.pdf.part"):
             raise PermissionError(13, "locked", str(path))
         real_remove(path)
 

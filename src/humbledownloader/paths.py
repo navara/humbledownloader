@@ -66,8 +66,14 @@ def target_path(library, entry):
 
 
 def collision_key(path):
-    """NTFS treats names case-insensitively; also compare Unicode-normalised."""
+    """Same file on this filesystem: NTFS treats names case-insensitively; also
+    compare Unicode-normalised."""
     return os.path.normcase(unicodedata.normalize("NFC", path))
+
+
+def _portable_key(path):
+    """Same name on NTFS, on every OS: the library must stay usable on Windows."""
+    return ntpath.normcase(unicodedata.normalize("NFC", path))
 
 
 def assign_targets(library, entries):
@@ -88,7 +94,7 @@ def assign_targets(library, entries):
         except PathError as err:
             errors.append((e, str(err)))
             continue
-        by_path.setdefault(collision_key(path), (path, []))[1].append(e)
+        by_path.setdefault(_portable_key(path), (path, []))[1].append(e)
     targets, conflicts = {}, {}
     for path, group in by_path.values():
         if len({e.md5 for e in group}) > 1:

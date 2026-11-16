@@ -12,6 +12,16 @@ def test_help_exits_cleanly(capsys):
     assert "humbledl" in capsys.readouterr().out
 
 
+def test_version_matches_the_package_metadata(capsys):
+    """__version__ and pyproject.toml are bumped by hand; catch one lagging."""
+    from importlib.metadata import version
+
+    with pytest.raises(SystemExit) as ex:
+        main(["--version"])
+    assert ex.value.code == 0
+    assert capsys.readouterr().out.strip() == f"humbledl {version('humbledownloader')}"
+
+
 def test_cookie_on_another_drive_and_exit_codes(tmp_path, monkeypatch):
     from humbledownloader import cli
     from humbledownloader.run import Summary

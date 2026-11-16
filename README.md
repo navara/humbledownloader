@@ -12,12 +12,28 @@ cannot read stops the run. Use it only to download content you own.
 
 ## Requirements
 
-- Python 3.15 or newer. uv installs it automatically; with pip or pipx, install it first (`uv python install 3.15` or python.org).
+- None for the ready-made executables. To install from source: Python 3.15 or newer. uv installs it automatically; with pip or pipx, install it first
+  (`uv python install 3.15` or python.org).
 - [uv](https://docs.astral.sh/uv/) is recommended. `pipx` or a plain `pip install` work too (the package builds with the standard PEP 517 `uv_build` backend).
 - A Humble Bundle account and a browser in which you are logged in to humblebundle.com.
-- Developed and used on Windows. Linux and macOS should work but are not tested yet.
+- Developed and used on Windows. CI also runs the tests on Linux; Linux and macOS have not been tried against the real site yet.
 
 ## Installation
+
+### Download a ready-made executable
+
+Each [release](https://github.com/navara/humbledownloader/releases) has a standalone `humbledl` for Windows (x64), Linux (x64) and macOS (Apple silicon).
+It needs no Python: unpack the archive and put `humbledl` (`humbledl.exe` on Windows) somewhere on your `PATH`. `SHA256SUMS` in the release lists the
+checksum of every file.
+
+The executables are not code-signed. Windows SmartScreen may warn on first run ("More info", then "Run anyway"). On macOS, clear the download quarantine
+once:
+
+```sh
+xattr -d com.apple.quarantine humbledl
+```
+
+### With uv, pipx or pip
 
 Install the command from GitHub:
 
@@ -147,11 +163,11 @@ entitlements the site offers as DRM-free downloads are used. Expired entries, en
 or md5 are skipped with a warning. Torrent links are ignored.
 
 **Folder layout.** Files are stored as `<library>/<bundle>/<product>/<file>`, with the bundle and product titles cleaned the same way `hbd` cleaned them (`+`
-becomes `_`, `:` becomes ` -`, only letters and digits of any script, spaces and `_ . - [ ]` are kept, leading and trailing spaces and trailing dots are removed).
-Store purchases titled "X (steam)" or "X (download)" are stored under "X". File names are used as Humble lists them. Names Windows cannot use (reserved names
-such as `CON`, illegal characters) and paths that, with the temporary `.part` suffix, reach 260 characters are reported as failures, on every operating system,
-so that the library stays usable on Windows. When two different files would land on the same path, this is reported as a conflict; if the file on disk has the
-size of exactly one of them, it is kept as that one, otherwise none of them is downloaded.
+becomes `_`, `:` becomes ` -`, only letters and digits of any script, spaces and `_ . - [ ]` are kept, leading and trailing spaces and trailing dots are
+removed). Store purchases titled "X (steam)" or "X (download)" are stored under "X". File names are used as Humble lists them. Names Windows cannot use
+(reserved names such as `CON`, illegal characters) and paths that, with the temporary `.part` suffix, reach 260 characters are reported as failures, on every
+operating system, so that the library stays usable on Windows. When two different files would land on the same path, this is reported as a conflict; if the file
+on disk has the size of exactly one of them, it is kept as that one, otherwise none of them is downloaded.
 
 **State file.** The tool records what it has in `<library>/.humble-state.json`: for every file its path relative to the library, Humble's entitlement and
 download ids, the catalog's size and md5, whether it was verified, and whether it was downloaded or adopted. The state is saved after each file. It does not
@@ -212,8 +228,8 @@ code 1. The tool does not try to work around bot detection; try again later.
 - The session cookie is sent only to humblebundle.com. Downloads use the signed links Humble returns (currently on cdn.humble.com) and are fetched without any
   cookies.
 - Logs, tracebacks and warnings are redacted before they are printed: cookie values, the query strings of signed download links (which carry an access token),
-  key fields and anything shaped like a product key (three or more dash-joined groups of 3-6 uppercase letters and digits, with at least one letter) are replaced with
-  `<redacted>`. The state file holds no cookies, links or keys.
+  key fields and anything shaped like a product key (three or more dash-joined groups of 3-6 uppercase letters and digits, with at least one letter) are
+  replaced with `<redacted>`. The state file holds no cookies, links or keys.
 - The tool reads library pages and calls exactly two of the site's actions: listing the Purchased tab and signing download links. It never redeems or reveals
   keys, never gifts, and never calls payment, membership or any other site action. From Purchased rows it reads only the row type and item id; key data is
   discarded.
@@ -239,7 +255,27 @@ uv run ruff check .             # lint
 uv run ruff format --check .    # formatting
 ```
 
-The tests use fakes and scrubbed fixtures; they never touch the network or a real Humble account.
+The tests use fakes and scrubbed fixtures; they never touch the network or a real Humble account. CI runs lint and tests on Linux and Windows.
+
+### Releasing
+
+A release is cut by pushing a version tag; pushing to `main` publishes nothing.
+
+1. Bump the version in `pyproject.toml` and `src/humbledownloader/__init__.py` (a test checks they agree), run `uv lock`, and commit.
+2. Tag that commit and push the tag:
+
+   ```sh
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+The [release workflow](.github/workflows/release.yml) refuses a tag that does not match the `pyproject.toml` version and runs the full CI matrix. It then
+builds the executables with PyInstaller (`packaging/launcher.py`) on Windows, Linux and macOS and runs `packaging/smoke_test.py` against each one: it checks
+`--version`, `--help` and the cookie file error, then sends the first request to a closed local proxy, which proves that HTTPS support and the CA bundle
+survived freezing without contacting Humble. Only when all of that passes does it publish the GitHub release, with the archives, the wheel, the sdist,
+`SHA256SUMS` and generated release notes. A failed run publishes nothing, so after a fix delete the tag, re-tag and push again.
+
+To prove the builds without releasing, run the workflow by hand from `main` (`gh workflow run release.yml`): it does everything except publish.
 
 ## License
 
