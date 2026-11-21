@@ -17,12 +17,15 @@ import warnings
 
 import requests
 
-from . import catalog
+from . import __version__, catalog
 from .flight import LayoutError, flight_text
 
 logger = logging.getLogger(__name__)
 
 BASE = "https://www.humblebundle.com"
+# Cloudflare blocks anonymous-looking POSTs (default python-requests agent, no Origin):
+# say honestly which tool this is, and send the Origin a browser would send.
+USER_AGENT = f"humbledl/{__version__} (+https://github.com/navara/humbledownloader)"
 TIMEOUT = (10, 60)
 PACE = 1.0  # seconds between requests to www
 RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -50,12 +53,26 @@ class Challenge(Exception):
     """Cloudflare asks for a browser check; this tool does not try to pass it."""
 
 
+class Blocked(Exception):
+    """Cloudflare's firewall refuses the request ("Sorry, you have been blocked")."""
+
+
 class SiteError(Exception):
     """A request kept failing."""
 
 
 class RateLimited(Exception):
     """Humble keeps answering 429: stop and try again later."""
+
+
+def _cloudflare_block(r):
+    """A 403 page from Cloudflare's firewall, not from Humble: no cf-mitigated header,
+    so it is not a browser check, and the session may well be valid."""
+    return (
+        r.status_code == 403
+        and r.headers.get("server", "").lower() == "cloudflare"
+        and b"you have been blocked" in r.content[:65536]
+    )
 
 
 def load_session(cookie_file):
@@ -77,6 +94,7 @@ def load_session(cookie_file):
             f"{cookie_file} holds {len(found)} ory_session_ cookies, expected 1"
         )
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     session.cookies.set_cookie(found[0])
     return session
 
@@ -115,6 +133,8 @@ class Site:
                 continue
             if r.headers.get("cf-mitigated") == "challenge":
                 raise Challenge(f"{method} {path}: Cloudflare challenge")
+            if _cloudflare_block(r):
+                raise Blocked(f"{method} {path}: HTTP {r.status_code}")
             if r.headers.get("x-action-redirect"):
                 raise SessionLost(f"{method} {path}: redirected by the server action")
             if r.status_code in RETRY_STATUSES:
@@ -166,7 +186,7 @@ class Site:
         """POST a server action; rediscover its id once if Humble redeployed."""
         aid = self._actions.get(name) or self._discover(path, html, name)
         for again in (True, False):
-            headers = {"Accept": "text/x-component", "Next-Action": aid}
+            headers = {"Accept": "text/x-component", "Next-Action": aid, "Origin": BASE}
             headers.update(headers_extra or {})
             r = self._request("POST", path, headers=headers, **kwargs)
             if r.status_code == 409 and r.headers.get("x-nextjs-action-not-found"):

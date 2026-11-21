@@ -7,6 +7,7 @@ from . import __version__, redact
 from .flight import LayoutError
 from .run import LibraryLocked, run
 from .site import (
+    Blocked,
     Challenge,
     CookieFileError,
     RateLimited,
@@ -108,6 +109,13 @@ def main(argv=None):
         sys.exit(1)
     except SessionLost as e:
         logger.error("Session lost (%s). Export the humblebundle.com cookies again.", e)
+        sys.exit(1)
+    except Blocked as e:
+        logger.error(
+            "%s: Cloudflare blocked the request. This is not a session problem; new "
+            "cookies will not help.",
+            e,
+        )
         sys.exit(1)
     except Challenge as e:
         logger.error("%s. Try again later; this tool does not solve browser checks.", e)

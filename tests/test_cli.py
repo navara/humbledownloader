@@ -61,6 +61,24 @@ def test_session_lost_exits_1(tmp_path, monkeypatch):
     assert ex.value.code == 1
 
 
+def test_cloudflare_block_exits_1_without_the_cookie_hint(
+    tmp_path, monkeypatch, capsys
+):
+    from humbledownloader import cli
+    from humbledownloader.site import Blocked
+
+    def blocked(path):
+        raise Blocked("POST /home/library: HTTP 403")
+
+    monkeypatch.setattr(cli, "load_session", blocked)
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["list", "-l", str(tmp_path), "-c", "c.txt"])
+    assert ex.value.code == 1
+    err = capsys.readouterr().err
+    assert "Cloudflare blocked the request" in err
+    assert "Export" not in err
+
+
 def test_cookie_file_error_exits_1_with_one_hint(tmp_path, capsys):
     from humbledownloader import cli
 

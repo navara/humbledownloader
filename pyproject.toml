@@ -1,6 +1,6 @@
 [project]
 name = "humbledownloader"
-version = "1.0.0"
+version = "1.0.1"
 description = "Download a Humble Bundle library from the redesigned Humble site"
 readme = "README.md"
 license = "MIT"

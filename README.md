@@ -203,8 +203,8 @@ only files it removes are its own `.part` files and its lock file.
 **Excluded platforms.** Files for excluded platforms (by default `mac` and `linux`) are counted as "excluded" and neither adopted nor downloaded.
 
 **Exit code.** 0 when nothing failed, 1 otherwise (conflicts alone do not fail a run). After three items in a row whose downloads all failed, the run stops. If
-the run stops early (session lost, rate limit, browser check, lock, unreadable state file, Ctrl+C), it prints the reason and exits 1 without a summary; files
-finished so far stay recorded.
+the run stops early (session lost, rate limit, browser check, Cloudflare block, lock, unreadable state file, Ctrl+C), it prints the reason and exits 1
+without a summary; files finished so far stay recorded.
 
 **Being polite to the site.** Requests to www.humblebundle.com are paced at about one per second. Requests that meet server errors or HTTP 429 are tried up to
 three times, honouring `Retry-After` up to 300 seconds. If Humble keeps asking to slow down, or shows a Cloudflare browser check, the run stops with exit
@@ -216,6 +216,8 @@ code 1. The tool does not try to work around bot detection; try again later.
 ## Troubleshooting
 
 - **"Session lost"**: export the cookie file again (see above).
+- **"Cloudflare blocked the request"**: Cloudflare's firewall refused a request although your session is valid. New cookies do not help; the tool does not try
+  to get around the block.
 - **Lock file**: a run that was killed leaves `<library>/.humble-lock`; delete it when no other run is active.
 - **State file cannot be read**: the run stops and leaves `.humble-state.json` untouched. If the previous save was interrupted, the newest state may be in
   `.humble-state.json.tmp`. To start over, move the state file away; existing files are then adopted again by size.

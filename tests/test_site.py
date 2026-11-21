@@ -5,6 +5,7 @@ import requests
 
 from humbledownloader.flight import LayoutError
 from humbledownloader.site import (
+    Blocked,
     Challenge,
     CookieFileError,
     SessionLost,
@@ -45,6 +46,7 @@ def test_load_session_keeps_only_the_session_cookie(tmp_path):
         cookie_file(tmp_path, ["ory_session_x", "csrf_token_y", "__cf_bm"])
     )
     assert [c.name for c in s.cookies] == ["ory_session_x"]
+    assert s.headers["User-Agent"].startswith("humbledl/")
 
 
 def test_load_session_without_session_cookie(tmp_path):
@@ -93,6 +95,25 @@ def test_page_without_login_state_is_layout_error():
 def test_redirect_or_auth_failure_is_session_lost(status):
     http = FakeHttp()
     http.add("GET", "/home/library", FakeResponse(status, ""))
+    with pytest.raises(SessionLost):
+        site_with(http).page("/home/library")
+
+
+BLOCK_PAGE = "<title>Attention Required! | Cloudflare</title><h1>Sorry, you have been blocked</h1>"
+
+
+def test_cloudflare_block_is_not_session_lost():
+    http = FakeHttp()
+    http.add(
+        "GET", "/home/library", FakeResponse(403, BLOCK_PAGE, {"server": "cloudflare"})
+    )
+    with pytest.raises(Blocked):
+        site_with(http).page("/home/library")
+
+
+def test_plain_403_through_cloudflare_is_still_session_lost():
+    http = FakeHttp()
+    http.add("GET", "/home/library", FakeResponse(403, "", {"server": "cloudflare"}))
     with pytest.raises(SessionLost):
         site_with(http).page("/home/library")
 
@@ -153,6 +174,11 @@ def test_sign_discovers_the_action_by_exact_name_and_maps_files():
         == "https://cdn/x?t=1"
     )
     assert not any(k[1].endswith(".torrent") for k in urls)
+    method, _, kwargs = http.calls[-1]
+    assert (
+        method == "POST"
+        and kwargs["headers"]["Origin"] == "https://www.humblebundle.com"
+    )
     _, _, kw = http.calls[-1]
     assert kw["headers"]["Next-Action"] == SIGN_ID
     assert json.loads(kw["data"]) == [["e1", "e2"]]
